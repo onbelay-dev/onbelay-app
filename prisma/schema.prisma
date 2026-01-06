@@ -10,7 +10,7 @@ datasource db {
 
 generator client {
   provider = "prisma-client"
-  //output   = "../src/generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 // Basic user with optional profiles
