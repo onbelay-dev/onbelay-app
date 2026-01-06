@@ -1,0 +1,55 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Basic user with optional profiles
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role
+  createdAt DateTime @default(now())
+
+  belayerProfile  BelayerProfile?
+  climberProfile  ClimberProfile?
+}
+
+// Belayer-specific profile
+model BelayerProfile {
+  id           String   @id @default(cuid())
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String   @unique
+  bio          String?
+  hourlyRate   Float?
+  rating       Float?   @default(0)
+  location     String?
+  availability String?
+  createdAt    DateTime @default(now())
+}
+
+// Climber-specific profile
+model ClimberProfile {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String   @unique
+  bio         String?
+  preferences String?
+  location    String?
+  createdAt   DateTime @default(now())
+}
+
+enum Role {
+  CLIMBER
+  BELAYER
+}
