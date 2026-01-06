@@ -27,15 +27,17 @@ model User {
 
 // Belayer-specific profile
 model BelayerProfile {
-  id           String   @id @default(cuid())
-  user         User     @relation(fields: [userId], references: [id])
-  userId       String   @unique
-  bio          String?
-  hourlyRate   Float?
-  rating       Float?   @default(0)
-  location     String?
-  availability String?
-  createdAt    DateTime @default(now())
+  id                String   @id @default(cuid())
+  user              User     @relation(fields: [userId], references: [id])
+  userId            String   @unique
+  bio               String?
+  certifiedLead     Boolean
+  certifiedTopRope  Boolean
+  hourlyRate        Float?
+  rating            Float?   @default(0)
+  location          String?
+  availability      String?
+  createdAt         DateTime @default(now())
 }
 
 // Climber-specific profile
