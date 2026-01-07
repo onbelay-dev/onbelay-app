@@ -4,29 +4,52 @@ import { prisma } from "@/lib/prisma";
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
-) {
+): Promise<void> {
   const { id } = req.query;
 
   if (!id || typeof id !== "string") {
-    return res.status(400).json({ error: "Invalid or missing ID" });
+    res.status(400).json({ error: "Invalid or missing ID" });
+    return;
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { id },
-      include: {
-        belayerProfile: true,
-        climberProfile: true,
-      },
-    });
+    if (req.method === "GET") {
+      const climber = await prisma.climberProfile.findUnique({
+        where: { id },
+        include: { user: true },
+      });
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      if (!climber) {
+        res.status(404).json({ error: "Climber not found" });
+        return;
+      }
+
+      res.status(200).json(climber);
+      return;
     }
 
-    res.status(200).json(user);
+    if (req.method === "PUT") {
+      const { bio, preferences, location } = req.body;
+
+      const updated = await prisma.climberProfile.update({
+        where: { id },
+        data: { bio, preferences, location },
+      });
+
+      res.status(200).json(updated);
+      return;
+    }
+
+    if (req.method === "DELETE") {
+      await prisma.climberProfile.delete({ where: { id } });
+      res.status(204).end();
+      return;
+    }
+
+    res.setHeader("Allow", ["GET", "PUT", "DELETE"]);
+    res.status(405).end(`Method ${req.method} Not Allowed`);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: "Internal server error" });
   }
 }

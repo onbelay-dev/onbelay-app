@@ -4,22 +4,44 @@ import { prisma } from "@/lib/prisma";
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
-) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
+): Promise<void> {
   try {
-    const users = await prisma.user.findMany({
-      include: {
-        belayerProfile: true,
-        climberProfile: true,
-      },
-    });
+    if (req.method === "GET") {
+      const climbers = await prisma.climberProfile.findMany({
+        include: {
+          user: true,
+        },
+      });
 
-    res.status(200).json(users);
+      res.status(200).json(climbers);
+      return;
+    }
+
+    if (req.method === "POST") {
+      const { userId, bio, preferences, location } = req.body;
+
+      if (!userId) {
+        res.status(400).json({ error: "userId is required" });
+        return;
+      }
+
+      const climber = await prisma.climberProfile.create({
+        data: {
+          userId,
+          bio,
+          preferences,
+          location,
+        },
+      });
+
+      res.status(201).json(climber);
+      return;
+    }
+
+    res.setHeader("Allow", ["GET", "POST"]);
+    res.status(405).end(`Method ${req.method} Not Allowed`);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: "Internal server error" });
   }
 }
