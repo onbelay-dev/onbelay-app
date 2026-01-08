@@ -7,11 +7,45 @@ export default async function handler(
 ): Promise<void> {
   try {
     if (req.method === "GET") {
+      const {
+        location,
+        certifiedLead,
+        certifiedTopRope,
+        maxRate,
+        availability,
+      } = req.query;
+
       const belayers = await prisma.belayerProfile.findMany({
+        where: {
+          location: location
+            ? { contains: String(location), mode: "insensitive" }
+            : undefined,
+
+          certifiedLead:
+            certifiedLead !== undefined
+              ? certifiedLead === "true"
+              : undefined,
+
+          certifiedTopRope:
+            certifiedTopRope !== undefined
+              ? certifiedTopRope === "true"
+              : undefined,
+
+          hourlyRate: maxRate ? { lte: Number(maxRate) } : undefined,
+
+          availability: availability
+            ? { contains: String(availability), mode: "insensitive" }
+            : undefined,
+        },
         include: {
           user: true,
         },
       });
+
+      if (!belayers || belayers.length === 0) {
+        res.status(200).json({ message: "No belayers found matching the criteria." });
+        return;
+      }
 
       res.status(200).json(belayers);
       return;

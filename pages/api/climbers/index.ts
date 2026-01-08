@@ -7,11 +7,29 @@ export default async function handler(
 ): Promise<void> {
   try {
     if (req.method === "GET") {
+      const { location, preferences } = req.query;
+
       const climbers = await prisma.climberProfile.findMany({
+        where: {
+          location: location
+            ? { contains: String(location), mode: "insensitive" }
+            : undefined,
+
+          preferences: preferences
+            ? { contains: String(preferences), mode: "insensitive" }
+            : undefined,
+        },
         include: {
           user: true,
         },
       });
+
+      if (!climbers || climbers.length === 0) {
+        res
+          .status(200)
+          .json({ message: "No climbers found matching the criteria." });
+        return;
+      }
 
       res.status(200).json(climbers);
       return;
