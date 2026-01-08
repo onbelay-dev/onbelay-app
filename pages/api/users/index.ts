@@ -1,72 +1,84 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
-import { Role } from "@prisma/client";
+import { Role, Prisma } from "@prisma/client";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
-): Promise<void> {
+) {
   try {
-    if (req.method === "GET") {
-      const { name, email, role } = req.query;
-
-      const users = await prisma.user.findMany({
-        where: {
-          name: name
-            ? { contains: String(name), mode: "insensitive" }
-            : undefined,
-
-          email: email
-            ? { contains: String(email), mode: "insensitive" }
-            : undefined,
-
-          role:
-            role && Object.values(Role).includes(role as Role)
-              ? (role as Role)
-              : undefined,
-        },
-        include: {
-          belayerProfile: true,
-          climberProfile: true,
-        },
-      });
-
-      if (!users || users.length === 0) {
-        res
-          .status(200)
-          .json({ message: "No users found matching the criteria." });
-        return;
-      }
-
-      res.status(200).json(users);
-      return;
+    if (req.method !== "GET") {
+      res.setHeader("Allow", ["GET"]);
+      return res.status(405).json({ error: "Method not allowed" });
     }
 
-    if (req.method === "POST") {
-      const { name, email, password, role } = req.body;
+    const { name, email, role } = req.query;
 
-      if (!name || !email || !password || !role) {
-        res.status(400).json({ error: "Missing required fields" });
-        return;
+    const andConditions: Prisma.UserWhereInput[] = [];
+
+    /* ---------- NAME (OR within field) ---------- */
+    if (typeof name === "string") {
+      const values = name.split(",").map(v => v.trim()).filter(Boolean);
+
+      if (values.length > 0) {
+        andConditions.push({
+          OR: values.map(value => ({
+            name: { contains: value, mode: "insensitive" },
+          })),
+        });
       }
-
-      const user = await prisma.user.create({
-        data: {
-          name,
-          email,
-          password,
-          role,
-        },
-      });
-
-      res.status(201).json(user);
-      return;
     }
 
-    res.setHeader("Allow", ["GET", "POST"]);
-    res.status(405).json({ error: "Method not allowed" });
+    /* ---------- EMAIL (OR within field) ---------- */
+    if (typeof email === "string") {
+      const values = email.split(",").map(v => v.trim()).filter(Boolean);
+
+      if (values.length > 0) {
+        andConditions.push({
+          OR: values.map(value => ({
+            email: { contains: value, mode: "insensitive" },
+          })),
+        });
+      }
+    }
+
+    /* ---------- ROLE (OR within field, exact match) ---------- */
+    if (typeof role === "string") {
+      const roles = role
+        .split(",")
+        .map(v => v.trim())
+        .filter((r): r is Role =>
+          Object.values(Role).includes(r as Role)
+        );
+
+      if (roles.length > 0) {
+        andConditions.push({
+          OR: roles.map(r => ({ role: r })),
+        });
+      }
+    }
+
+    const where: Prisma.UserWhereInput | undefined =
+      andConditions.length > 0 ? { AND: andConditions } : undefined;
+
+    const users = await prisma.user.findMany({
+      where,
+      include: {
+        belayerProfile: true,
+        climberProfile: true,
+      },
+    });
+
+    if (users.length === 0) {
+      return res.status(200).json({
+        message: "No users found matching criteria",
+        data: [],
+      });
+    }
+
+    return res.status(200).json(users);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 }
