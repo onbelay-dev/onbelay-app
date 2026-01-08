@@ -1,65 +1,80 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
-): Promise<void> {
+) {
   try {
     if (req.method === "GET") {
-      const { location, preferences } = req.query;
+      const { location, preferences, bio } = req.query;
 
-      const climbers = await prisma.climberProfile.findMany({
-        where: {
-          location: location
-            ? { contains: String(location), mode: "insensitive" }
-            : undefined,
+      const andConditions: Prisma.ClimberProfileWhereInput[] = [];
 
-          preferences: preferences
-            ? { contains: String(preferences), mode: "insensitive" }
-            : undefined,
-        },
-        include: {
-          user: true,
-        },
-      });
-
-      if (!climbers || climbers.length === 0) {
-        res
-          .status(200)
-          .json({ message: "No climbers found matching the criteria." });
-        return;
+      // ---------- LOCATION ----------
+      if (typeof location === "string") {
+        const values = location.split(",").map(v => v.trim()).filter(Boolean);
+        if (values.length > 0) {
+          andConditions.push({
+            OR: values.map(v => ({ location: { contains: v, mode: "insensitive" } })),
+          });
+        }
       }
 
-      res.status(200).json(climbers);
-      return;
+      // ---------- PREFERENCES ----------
+      if (typeof preferences === "string") {
+        const values = preferences.split(",").map(v => v.trim()).filter(Boolean);
+        if (values.length > 0) {
+          andConditions.push({
+            OR: values.map(v => ({ preferences: { contains: v, mode: "insensitive" } })),
+          });
+        }
+      }
+
+      // ---------- BIO ----------
+      if (typeof bio === "string") {
+        const values = bio.split(",").map(v => v.trim()).filter(Boolean);
+        if (values.length > 0) {
+          andConditions.push({
+            OR: values.map(v => ({ bio: { contains: v, mode: "insensitive" } })),
+          });
+        }
+      }
+
+      const where: Prisma.ClimberProfileWhereInput | undefined =
+        andConditions.length > 0 ? { AND: andConditions } : undefined;
+
+      const climbers = await prisma.climberProfile.findMany({
+        where,
+        include: { user: true },
+      });
+
+      if (climbers.length === 0) {
+        return res.status(200).json({ message: "No climbers found", data: [] });
+      }
+
+      return res.status(200).json(climbers);
     }
 
     if (req.method === "POST") {
       const { userId, bio, preferences, location } = req.body;
 
       if (!userId) {
-        res.status(400).json({ error: "userId is required" });
-        return;
+        return res.status(400).json({ error: "userId is required" });
       }
 
       const climber = await prisma.climberProfile.create({
-        data: {
-          userId,
-          bio,
-          preferences,
-          location,
-        },
+        data: { userId, bio, preferences, location },
       });
 
-      res.status(201).json(climber);
-      return;
+      return res.status(201).json(climber);
     }
 
     res.setHeader("Allow", ["GET", "POST"]);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+    return res.status(405).json({ error: "Method not allowed" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 }
